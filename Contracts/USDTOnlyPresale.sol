@@ -13,40 +13,43 @@ interface IERC20 {
     function decimals() external view returns (uint8);
 }
 
-contract MotraPresale {
+/**
+ * @title USDT-Only Presale Contract
+ * @dev A presale contract for selling ERC20 tokens with USDT payments only
+ * Supports USDT payments + Thirdweb Buy Crypto for card payments
+ */
+contract USDTOnlyPresale {
     address public owner;
     address public tokenAddress;
     address public usdtAddress;
-    uint256 public tokenPrice;
-    uint256 public usdtPrice;
+    uint256 public usdtPrice; // Price per token in USDT (with 6 decimals)
     uint256 public totalSoldTokens;
     uint8 public tokenDecimals;
     bool public presaleActive;
-    bool public usdtEnabled;
     
+    // Reentrancy guard
     uint256 private constant _NOT_ENTERED = 1;
     uint256 private constant _ENTERED = 2;
     uint256 private _status;
 
+    // Events
     event TokensPurchased(address indexed buyer, uint256 amount, uint256 cost, string paymentMethod);
     event TokenUpdated(address indexed token);
     event USDTAddressUpdated(address indexed usdt);
-    event PriceUpdated(uint256 newEthPrice, uint256 newUsdtPrice);
+    event USDTPriceUpdated(uint256 newUsdtPrice);
     event TokensWithdrawn(uint256 amount);
-    event EthReceived(address indexed sender, uint256 amount);
+    event USDTReceived(address indexed sender, uint256 amount);
     event PresaleStatusChanged(bool active);
-    event USDTStatusChanged(bool enabled);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
+    // Custom errors (gas efficient)
     error OnlyOwner();
     error ZeroAddress();
     error ZeroAmount();
-    error InsufficientETH();
     error InsufficientUSDT();
     error TokenSoldOut();
     error TransferFailed();
     error PresaleInactive();
-    error USDTNotEnabled();
     error ReentrancyGuard();
 
     modifier onlyOwner() {
@@ -66,18 +69,16 @@ contract MotraPresale {
         _;
     }
 
-    modifier usdtIsEnabled() {
-        if (!usdtEnabled) revert USDTNotEnabled();
-        _;
-    }
-
     constructor() {
         owner = msg.sender;
         _status = _NOT_ENTERED;
         presaleActive = false;
-        usdtEnabled = false;
     }
 
+    /**
+     * @dev Update the token address for the presale
+     * @param _tokenAddress The address of the ERC20 token
+     */
     function updateToken(address _tokenAddress) external onlyOwner {
         if (_tokenAddress == address(0)) revert ZeroAddress();
         tokenAddress = _tokenAddress;
@@ -85,74 +86,39 @@ contract MotraPresale {
         emit TokenUpdated(tokenAddress);
     }
 
+    /**
+     * @dev Update the USDT address
+     * @param _usdtAddress The address of the USDT token
+     */
     function updateUSDTAddress(address _usdtAddress) external onlyOwner {
         if (_usdtAddress == address(0)) revert ZeroAddress();
         usdtAddress = _usdtAddress;
         emit USDTAddressUpdated(usdtAddress);
     }
 
-    function updateTokenPrices(uint256 _ethPrice, uint256 _usdtPrice) external onlyOwner {
-        if (_ethPrice == 0) revert ZeroAmount();
+    /**
+     * @dev Update the USDT price per token
+     * @param _usdtPrice New price per token in USDT (with 6 decimals)
+     */
+    function updateUSDTPrice(uint256 _usdtPrice) external onlyOwner {
         if (_usdtPrice == 0) revert ZeroAmount();
-        
-        tokenPrice = _ethPrice;
         usdtPrice = _usdtPrice;
-        emit PriceUpdated(tokenPrice, usdtPrice);
+        emit USDTPriceUpdated(usdtPrice);
     }
 
+    /**
+     * @dev Toggle presale status
+     */
     function togglePresale() external onlyOwner {
         presaleActive = !presaleActive;
         emit PresaleStatusChanged(presaleActive);
     }
 
-    function toggleUSDT() external onlyOwner {
-        usdtEnabled = !usdtEnabled;
-        emit USDTStatusChanged(usdtEnabled);
-    }
-
-    function buyTokenWithETH(uint256 _buyAmount) external payable nonReentrant presaleIsActive {
-        if (_buyAmount == 0) revert ZeroAmount();
-        if (tokenAddress == address(0)) revert ZeroAddress();
-        
-        uint256 totalCost = _buyAmount * tokenPrice;
-        if (msg.value != totalCost) revert InsufficientETH();
-
-        IERC20 token = IERC20(tokenAddress);
-        uint256 amountWithDecimals = _buyAmount * (10 ** uint256(tokenDecimals));
-        
-        if (amountWithDecimals > token.balanceOf(address(this))) revert TokenSoldOut();
-        
-        if (!token.transfer(msg.sender, amountWithDecimals)) revert TransferFailed();
-        
-        (bool success, ) = payable(owner).call{value: msg.value}("");
-        if (!success) revert TransferFailed();
-        
-        totalSoldTokens += amountWithDecimals;
-        emit TokensPurchased(msg.sender, amountWithDecimals, totalCost, "ETH");
-    }
-
-    function buyToken(uint256 _buyAmount) external payable nonReentrant presaleIsActive {
-        if (_buyAmount == 0) revert ZeroAmount();
-        if (tokenAddress == address(0)) revert ZeroAddress();
-        
-        uint256 totalCost = _buyAmount * tokenPrice;
-        if (msg.value != totalCost) revert InsufficientETH();
-
-        IERC20 token = IERC20(tokenAddress);
-        uint256 amountWithDecimals = _buyAmount * (10 ** uint256(tokenDecimals));
-        
-        if (amountWithDecimals > token.balanceOf(address(this))) revert TokenSoldOut();
-        
-        if (!token.transfer(msg.sender, amountWithDecimals)) revert TransferFailed();
-        
-        (bool success, ) = payable(owner).call{value: msg.value}("");
-        if (!success) revert TransferFailed();
-        
-        totalSoldTokens += amountWithDecimals;
-        emit TokensPurchased(msg.sender, amountWithDecimals, totalCost, "ETH");
-    }
-
-    function buyTokenWithUSDT(uint256 _buyAmount) external nonReentrant presaleIsActive usdtIsEnabled {
+    /**
+     * @dev Buy tokens with USDT during presale
+     * @param _buyAmount Number of tokens to buy (without decimals)
+     */
+    function buyTokenWithUSDT(uint256 _buyAmount) external nonReentrant presaleIsActive {
         if (_buyAmount == 0) revert ZeroAmount();
         if (tokenAddress == address(0)) revert ZeroAddress();
         if (usdtAddress == address(0)) revert ZeroAddress();
@@ -165,31 +131,66 @@ contract MotraPresale {
         
         if (amountWithDecimals > token.balanceOf(address(this))) revert TokenSoldOut();
         
+        // Check USDT allowance and balance
         if (usdt.balanceOf(msg.sender) < totalCost) revert InsufficientUSDT();
         if (usdt.allowance(msg.sender, address(this)) < totalCost) revert InsufficientUSDT();
         
+        // Transfer USDT from buyer to owner
         if (!usdt.transferFrom(msg.sender, owner, totalCost)) revert TransferFailed();
         
+        // Transfer tokens to buyer
         if (!token.transfer(msg.sender, amountWithDecimals)) revert TransferFailed();
         
         totalSoldTokens += amountWithDecimals;
         emit TokensPurchased(msg.sender, amountWithDecimals, totalCost, "USDT");
     }
 
+    /**
+     * @dev Buy tokens with USDT - Alternative function name for compatibility
+     * @param _buyAmount Number of tokens to buy (without decimals)
+     */
+    function buyToken(uint256 _buyAmount) external nonReentrant presaleIsActive {
+        if (_buyAmount == 0) revert ZeroAmount();
+        if (tokenAddress == address(0)) revert ZeroAddress();
+        if (usdtAddress == address(0)) revert ZeroAddress();
+        
+        uint256 totalCost = _buyAmount * usdtPrice;
+        
+        IERC20 token = IERC20(tokenAddress);
+        IERC20 usdt = IERC20(usdtAddress);
+        uint256 amountWithDecimals = _buyAmount * (10 ** uint256(tokenDecimals));
+        
+        if (amountWithDecimals > token.balanceOf(address(this))) revert TokenSoldOut();
+        
+        // Check USDT allowance and balance
+        if (usdt.balanceOf(msg.sender) < totalCost) revert InsufficientUSDT();
+        if (usdt.allowance(msg.sender, address(this)) < totalCost) revert InsufficientUSDT();
+        
+        // Transfer USDT from buyer to owner
+        if (!usdt.transferFrom(msg.sender, owner, totalCost)) revert TransferFailed();
+        
+        // Transfer tokens to buyer
+        if (!token.transfer(msg.sender, amountWithDecimals)) revert TransferFailed();
+        
+        totalSoldTokens += amountWithDecimals;
+        emit TokensPurchased(msg.sender, amountWithDecimals, totalCost, "USDT");
+    }
+
+    /**
+     * @dev Get comprehensive token information
+     */
     function getTokenInfo() external view returns (
         string memory name,
         string memory symbol,
         uint256 balance,
         uint256 totalSupply,
-        uint256 ethPrice,
         uint256 usdtPriceValue,
         address tokenAdd,
         address usdtAdd,
-        bool active,
-        bool usdtActive
+        bool active
     ) {
         if (tokenAddress == address(0)) {
-            return ("", "", 0, 0, tokenPrice, usdtPrice, address(0), usdtAddress, presaleActive, usdtEnabled);
+            return ("", "", 0, 0, usdtPrice, address(0), usdtAddress, presaleActive);
         }
         
         IERC20 token = IERC20(tokenAddress);
@@ -198,15 +199,16 @@ contract MotraPresale {
             token.symbol(),
             token.balanceOf(address(this)),
             token.totalSupply(),
-            tokenPrice,
             usdtPrice,
             tokenAddress,
             usdtAddress,
-            presaleActive,
-            usdtEnabled
+            presaleActive
         );
     }
 
+    /**
+     * @dev Emergency function to withdraw all tokens
+     */
     function withdrawAllTokens() external onlyOwner nonReentrant {
         if (tokenAddress == address(0)) revert ZeroAddress();
         
@@ -218,14 +220,9 @@ contract MotraPresale {
         emit TokensWithdrawn(balance);
     }
 
-    function withdrawETH() external onlyOwner {
-        uint256 balance = address(this).balance;
-        if (balance == 0) revert ZeroAmount();
-        
-        (bool success, ) = payable(owner).call{value: balance}("");
-        if (!success) revert TransferFailed();
-    }
-
+    /**
+     * @dev Emergency function to withdraw USDT (if any gets stuck)
+     */
     function withdrawUSDT() external onlyOwner {
         if (usdtAddress == address(0)) revert ZeroAddress();
         
@@ -236,27 +233,34 @@ contract MotraPresale {
         if (!usdt.transfer(owner, balance)) revert TransferFailed();
     }
 
+    /**
+     * @dev Transfer ownership
+     */
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert ZeroAddress();
         emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
     }
 
-    receive() external payable {
-        (bool success, ) = payable(owner).call{value: msg.value}("");
-        if (!success) revert TransferFailed();
-        emit EthReceived(msg.sender, msg.value);
+    /**
+     * @dev Get contract balance in USDT
+     */
+    function getContractUSDTBalance() external view returns (uint256) {
+        if (usdtAddress == address(0)) return 0;
+        return IERC20(usdtAddress).balanceOf(address(this));
     }
 
+    /**
+     * @dev Get remaining tokens available for sale
+     */
     function getRemainingTokens() external view returns (uint256) {
         if (tokenAddress == address(0)) return 0;
         return IERC20(tokenAddress).balanceOf(address(this));
     }
 
-    function calculateEthCost(uint256 _tokenAmount) external view returns (uint256) {
-        return _tokenAmount * tokenPrice;
-    }
-
+    /**
+     * @dev Calculate cost in USDT for given token amount
+     */
     function calculateUsdtCost(uint256 _tokenAmount) external view returns (uint256) {
         return _tokenAmount * usdtPrice;
     }
