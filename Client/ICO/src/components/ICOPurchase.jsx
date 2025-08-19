@@ -327,55 +327,32 @@ export default function ICOPurchase() {
         </button>
       )}
 
-      {paymentMethod === "fiat" && tokenAmount && parseFloat(tokenAmount) > 0 && (
-        <div className="ico-purchase__fiat-section">
-          <div className="ico-purchase__fiat-container">
-            <h4 className="ico-purchase__fiat-title">
-              Buy {tokenAmount} MOTRA Tokens with Fiat
-            </h4>
-            <p className="ico-purchase__fiat-description">
-              Pay with credit cards, bank transfers, or stablecoins
-            </p>
-            
-            <div className="ico-purchase__usdc-calculator">
-              <p className="ico-purchase__calculator-title">
-                💡 How much USDC do you need?
-              </p>
-              <p className="ico-purchase__calculator-text">
-                For {tokenAmount} MOTRA tokens, you need approximately <strong>{displayUsdcCost()} USDC</strong>
-              </p>
-            </div>
-
-            <div className="ico-purchase__fiat-options">
-              <div className="ico-purchase__fiat-option">
-                <h5>Option 1: Buy USDC First</h5>
-                <p>Purchase USDC with fiat, then switch to "USDC Payment" to buy tokens</p>
-                <BuyWidget
-                  client={client}
-                  title="Buy USDC to Purchase MOTRA"
-                  tokenAddress="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-                  chain={chain}
-                  amount={displayUsdcCost()}
-                  className="ico-purchase__buy-widget"
-                  theme="light"
-                />
-              </div>
-
-              <div className="ico-purchase__fiat-option">
-                <h5>Option 2: Direct Purchase (Recommended)</h5>
-                <p>Buy tokens directly with fiat - no USDC approval needed!</p>
-                <button
-                  className="btn-primary ico-purchase__direct-purchase-button"
-                  onClick={() => setPaymentMethod("usdt")}
-                  style={{ marginTop: "10px" }}
-                >
-                  Switch to Direct Purchase
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+             {paymentMethod === "fiat" && tokenAmount && parseFloat(tokenAmount) > 0 && (
+         <div className="ico-purchase__fiat-section">
+           <div className="ico-purchase__fiat-info">
+             <p className="ico-purchase__fiat-summary">
+               💡 For {tokenAmount} MOTRA tokens, you need approximately <strong>{displayUsdcCost()} USDC</strong> worth of fiat
+             </p>
+             <p className="ico-purchase__fiat-description">
+               Pay with credit cards, bank transfers, or stablecoins
+             </p>
+           </div>
+           
+           <BuyWidget
+             client={client}
+             title="Buy MOTRA Tokens with Fiat"
+             tokenAddress="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+             chain={chain}
+             amount={displayUsdcCost()}
+             className="ico-purchase__buy-widget"
+             theme="light"
+           />
+           
+           <p className="ico-purchase__fiat-note">
+             💡 After purchasing USDC, switch to "USDC Payment" to complete your MOTRA token purchase.
+           </p>
+         </div>
+       )}
 
       {(totalSold !== undefined && totalSold !== null && (() => { try { return BigInt(totalSold) > 0n; } catch { return false; } })()) ? (
         <div className="ico-purchase__total-sold">
