@@ -278,7 +278,7 @@ contract MotraPresale {
     }
 
     /**
-     * @dev Emergency function to withdraw all tokens
+     * @dev panic function to withdraw all tokens
      */
     function withdrawAllTokens() external onlyOwner nonReentrant {
         if (tokenAddress == address(0)) revert ZeroAddress();
