@@ -10,6 +10,7 @@ function App() {
         <div className="container">
           <div className="header-content">
             <div className="logo-section">
+              <img src="/vite.png" alt="MOTRA Logo" className="logo-image" />
               <h1 className="logo-title">MOTRA</h1>
               <p className="logo-subtitle">
                 Web3 Fitness Platform

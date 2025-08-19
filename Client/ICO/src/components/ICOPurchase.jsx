@@ -169,7 +169,6 @@ export default function ICOPurchase() {
         onSuccess: () => {
           setTokenAmount("");
           setError(null);
-          alert("Purchase successful!");
           setLoading(false);
         },
         onError: (error) => {

@@ -155,13 +155,7 @@
   text-align: center;
 }
 
-.ico-purchase__fiat-instructions {
-  font-size: 0.75rem;
-  color: var(--orange-600);
-  margin-bottom: 16px;
-  text-align: center;
-  font-weight: 600;
-}
+
 
 .ico-purchase__usdc-calculator {
   margin-bottom: 16px;
